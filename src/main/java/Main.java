@@ -1,7 +1,13 @@
+import java.util.List;
+import java.util.Map;
+
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import com.openai.models.chat.completions.ChatCompletionTool;
+
+
 
 public class Main {
     public static void main(String[] args) {
@@ -27,13 +33,29 @@ public class Main {
                 .baseUrl(baseUrl)
                 .build();
 
-        ChatCompletion response = client.chat().completions().create(
-                ChatCompletionCreateParams.builder()
-                        .model("anthropic/claude-haiku-4.5")
-                        .addUserMessage(prompt)
-                        .addTool(ReadFileTool.class)
-                        .build()
-        );
+        ChatCompletionTool readBuild = 
+            tool(
+                    "Read",
+                    "Read and return the contents of a file",
+                    Map.of(
+                            "file_path",
+                            Map.of(
+                                    "type",
+                                    "string",
+                                    "description",
+                                    "The path to the file to read")),
+                    List.of("file_path"));
+
+        ChatCompletion response =
+                client.chat()
+                        .completions()
+                        .create(
+                                ChatCompletionCreateParams.builder()
+                                        .model("anthropic/claude-haiku-4.5")
+                                        .tools(List.of(readBuild))
+                                        .addUserMessage(prompt)
+                                        .build());
+        
 
         if (response.choices().isEmpty()) {
             throw new RuntimeException("no choices in response");
