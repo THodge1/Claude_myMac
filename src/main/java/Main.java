@@ -3,6 +3,9 @@ import java.util.Map;
 
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
+import com.openai.core.JsonValue;
+import com.openai.models.FunctionDefinition;
+import com.openai.models.FunctionParameters;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionTool;
@@ -66,5 +69,29 @@ public class Main {
 
         // TODO: Uncomment the line below to pass the first stage
         System.out.print(response.choices().get(0).message().content().orElse(""));
+    }
+
+
+    private static ChatCompletionTool tool(
+            String name,
+            String description,
+            Map<String, Object> properties,
+            List<String> required) {
+        return ChatCompletionTool.builder()
+                .function(
+                        FunctionDefinition.builder()
+                                .name(name)
+                                .description(description)
+                                .parameters(
+                                        FunctionParameters.builder()
+                                                .putAdditionalProperty(
+                                                        "type", JsonValue.from("object"))
+                                                .putAdditionalProperty(
+                                                        "properties", JsonValue.from(properties))
+                                                .putAdditionalProperty(
+                                                        "required", JsonValue.from(required))
+                                                .build())
+                                .build())
+                .build();
     }
 }
