@@ -1,5 +1,6 @@
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -10,9 +11,13 @@ import com.openai.core.JsonValue;
 import com.openai.models.FunctionDefinition;
 import com.openai.models.FunctionParameters;
 import com.openai.models.chat.completions.ChatCompletion;
+import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionMessage;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
 import com.openai.models.chat.completions.ChatCompletionTool;
+import com.openai.models.chat.completions.ChatCompletionToolMessageParam;
+import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 
 
 
@@ -53,6 +58,25 @@ public class Main {
                                     "The path to the file to read")),
                     List.of("file_path"));
 
+
+
+        
+        
+        List<ChatCompletionMessageParam> messages = new ArrayList<>();
+
+        ChatCompletionUserMessageParam innerUser = ChatCompletionUserMessageParam.builder()
+        .content(prompt)
+        .build();
+
+        ChatCompletionMessageParam userMessage = ChatCompletionMessageParam.ofUser(innerUser);
+
+        messages.add(userMessage);
+
+        
+        while (true) {
+        
+        
+        
         ChatCompletion response =
                 client.chat()
                         .completions()
@@ -60,18 +84,16 @@ public class Main {
                                 ChatCompletionCreateParams.builder()
                                         .model("anthropic/claude-haiku-4.5")
                                         .tools(List.of(readBuild))
-                                        .addUserMessage(prompt)
+                                        .messages(messages)
                                         .build());
-        
-
-        if (response.choices().isEmpty()) {
-            
-        }
 
         ChatCompletionMessage message = response.choices().get(0).message();
-
         var tCalls = message.toolCalls();
-        
+
+        ChatCompletionAssistantMessageParam assistantParam = message.toParam();
+        ChatCompletionMessageParam assistantMessage = ChatCompletionMessageParam.ofAssistant(assistantParam);
+        messages.add(assistantMessage);
+
         if (tCalls.isPresent()) {
             //throw new RuntimeException("tool calls are not supported yet");
 
@@ -80,10 +102,36 @@ public class Main {
             var function = toolCall.function();
             String toolName = function.name();
             String argumentsJson = function.arguments();
-            ObjectMapper mapper = new ObjectMapper();
-            ReadFileTool parsed;
             
-            try {
+            String toolCallId = toolCall.id();
+            String result = executeReadTool(argumentsJson);
+
+            ChatCompletionToolMessageParam toolParam = ChatCompletionToolMessageParam.builder()
+            .toolCallId(toolCallId)
+            .content(result)
+            .build();
+
+
+            ChatCompletionMessageParam toolMessage = ChatCompletionMessageParam.ofTool(toolParam);
+            messages.add(toolMessage);
+            
+
+        } else {
+            System.out.print(response.choices().get(0).message().content().orElse(""));
+            break;
+        }
+
+        // You can use print statements as follows for debugging, they'll be visible when running tests.
+        System.err.println("Logs from your program will appear here!");
+
+    }
+}
+
+
+    private static String executeReadTool(String argumentsJson) {
+        ObjectMapper mapper = new ObjectMapper();
+        ReadFileTool parsed;
+        try {
                 // try catch for parsing the argumentsJson into ReadFileTool
                 parsed = mapper.readValue(argumentsJson, ReadFileTool.class);
             } catch (Exception e) {
@@ -100,19 +148,8 @@ public class Main {
             } catch (Exception e) {
                 throw new RuntimeException("Failed to read file: " + parsed.filePath, e);
             }
-            System.out.print(fileContents);
-
-        } else {
-            System.out.print(response.choices().get(0).message().content().orElse(""));
-        }
-
-        // You can use print statements as follows for debugging, they'll be visible when running tests.
-        System.err.println("Logs from your program will appear here!");
-
-        // TODO: Uncomment the line below to pass the first stage
-        
+            return fileContents;
     }
-
 
     private static ChatCompletionTool tool(
             String name,
