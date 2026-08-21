@@ -61,7 +61,25 @@ public class Main {
 
 
         
-        
+        ChatCompletionTool writeBuild =
+            tool(
+                    "Write",
+                    "Write content to a file",
+                    Map.of(
+                            "file_path",
+                            Map.of(
+                                    "type",
+                                    "string",
+                                    "description",
+                                    "The path to the file to write"),
+                            "content",
+                            Map.of(
+                                    "type",
+                                    "string",
+                                    "description",
+                                    "The content to write to the file")),
+                    List.of("file_path", "content"));
+
         List<ChatCompletionMessageParam> messages = new ArrayList<>();
 
         ChatCompletionUserMessageParam innerUser = ChatCompletionUserMessageParam.builder()
@@ -83,7 +101,7 @@ public class Main {
                         .create(
                                 ChatCompletionCreateParams.builder()
                                         .model("anthropic/claude-haiku-4.5")
-                                        .tools(List.of(readBuild))
+                                        .tools(List.of(readBuild, writeBuild))
                                         .messages(messages)
                                         .build());
 
@@ -104,7 +122,14 @@ public class Main {
             String argumentsJson = function.arguments();
             
             String toolCallId = toolCall.id();
-            String result = executeReadTool(argumentsJson);
+            String result;
+            if ("Read".equals(toolName)) {
+                result = executeReadTool(argumentsJson);
+            } else if ("Write".equals(toolName)) {
+                result = executeWriteTool(argumentsJson);
+            } else {
+                throw new RuntimeException("Unknown tool: " + toolName);
+            }
 
             ChatCompletionToolMessageParam toolParam = ChatCompletionToolMessageParam.builder()
             .toolCallId(toolCallId)
@@ -149,6 +174,29 @@ public class Main {
                 throw new RuntimeException("Failed to read file: " + parsed.filePath, e);
             }
             return fileContents;
+    }
+
+    private static String executeWriteTool(String argumentsJson) {
+        
+        ObjectMapper mapper = new ObjectMapper();
+        WriteFileTool parsed;
+        try {
+                // try catch for parsing the argumentsJson into WriteFileTool
+                parsed = mapper.readValue(argumentsJson, WriteFileTool.class);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to parse tool arguments", e);
+            }
+
+            parsed.filePath = parsed.filePath.trim();
+            
+            Path filePath = Path.of(parsed.filePath);
+
+            try {
+                Files.writeString(filePath, parsed.content);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to write to file: " + parsed.filePath, e);
+            }
+            return "Successfully wrote to file: " + parsed.filePath;
     }
 
     private static ChatCompletionTool tool(
