@@ -80,6 +80,19 @@ public class Main {
                                     "The content to write to the file")),
                     List.of("file_path", "content"));
 
+        ChatCompletionTool bashBuild =
+            tool(
+                    "Bash",
+                    "Execute a bash command and return the output",
+                    Map.of(
+                            "command",
+                            Map.of(
+                                    "type",
+                                    "string",
+                                    "description",
+                                    "The bash command to execute")),
+                    List.of("command"));
+
         List<ChatCompletionMessageParam> messages = new ArrayList<>();
 
         ChatCompletionUserMessageParam innerUser = ChatCompletionUserMessageParam.builder()
@@ -100,8 +113,8 @@ public class Main {
                         .completions()
                         .create(
                                 ChatCompletionCreateParams.builder()
-                                        .model("anthropic/claude-haiku-4.5")
-                                        .tools(List.of(readBuild, writeBuild))
+                                        .model("openrouter/free")
+                                        .tools(List.of(readBuild, writeBuild, bashBuild))
                                         .messages(messages)
                                         .build());
 
@@ -127,6 +140,8 @@ public class Main {
                 result = executeReadTool(argumentsJson);
             } else if ("Write".equals(toolName)) {
                 result = executeWriteTool(argumentsJson);
+            } else if ("Bash".equals(toolName)) {
+                result = executeBashTool(argumentsJson);
             } else {
                 throw new RuntimeException("Unknown tool: " + toolName);
             }
@@ -198,6 +213,47 @@ public class Main {
             }
             return "Successfully wrote to file: " + parsed.filePath;
     }
+
+    private static String executeBashTool(String argumentsJson) {
+        ObjectMapper mapper = new ObjectMapper();
+        BashTool parsed;
+
+       
+
+        try {
+            parsed = mapper.readValue(argumentsJson, BashTool.class);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to parse tool arguments", e);
+            }
+
+            ProcessBuilder builder = new ProcessBuilder("sh", "-c", parsed.command);
+
+            builder.redirectErrorStream(true);
+
+            Process process;
+            try {
+                process = builder.start();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to execute bash command: " + parsed.command, e);
+            }
+
+            
+            
+            byte[] bytesArray;
+            try {
+                process.waitFor();
+                bytesArray = process.getInputStream().readAllBytes();
+            } catch (Exception e) {
+                throw new RuntimeException("Bash command was interrupted: " + parsed.command, e);
+            }
+            String result = new String(bytesArray);
+
+            return result;
+    }
+
+        //     parsed.filePath = parsed.filePath.trim();
+
+        //     Path filePath = Path.of(parsed.filePath);
 
     private static ChatCompletionTool tool(
             String name,
