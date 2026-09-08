@@ -113,7 +113,7 @@ public class Main {
                         .completions()
                         .create(
                                 ChatCompletionCreateParams.builder()
-                                        .model("openrouter/free")
+                                        .model("anthropic/claude-haiku-4.5")
                                         .tools(List.of(readBuild, writeBuild, bashBuild))
                                         .messages(messages)
                                         .build());
@@ -250,10 +250,6 @@ public class Main {
 
             return result;
     }
-
-        //     parsed.filePath = parsed.filePath.trim();
-
-        //     Path filePath = Path.of(parsed.filePath);
 
     private static ChatCompletionTool tool(
             String name,
